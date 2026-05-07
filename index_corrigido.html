@@ -1,0 +1,618 @@
+<!DOCTYPE html>
+<html lang="pt-BR">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>Quiz - Squad Ânima</title>
+    <script src="https://cdnjs.cloudflare.com/ajax/libs/qrcodejs/1.0.0/qrcode.min.js"></script>
+    <script src="https://cdn.jsdelivr.net/npm/@supabase/supabase-js@2"></script>
+    <style>
+        * {
+            margin: 0;
+            padding: 0;
+            box-sizing: border-box;
+        }
+
+        body {
+            font-family: 'Segoe UI', Tahoma, Geneva, Verdana, sans-serif;
+            background: linear-gradient(135deg, #667eea 0%, #764ba2 100%);
+            min-height: 100vh;
+            display: flex;
+            justify-content: center;
+            align-items: center;
+            padding: 20px;
+        }
+
+        .container {
+            background: white;
+            border-radius: 12px;
+            box-shadow: 0 20px 60px rgba(0, 0, 0, 0.3);
+            max-width: 600px;
+            width: 100%;
+            padding: 40px;
+        }
+
+        .screen {
+            display: none;
+        }
+
+        .screen.active {
+            display: block;
+            animation: fadeIn 0.3s ease-in;
+        }
+
+        @keyframes fadeIn {
+            from { opacity: 0; }
+            to { opacity: 1; }
+        }
+
+        h1 {
+            color: #333;
+            margin-bottom: 10px;
+            font-size: 28px;
+        }
+
+        .subtitle {
+            color: #666;
+            margin-bottom: 30px;
+            font-size: 14px;
+        }
+
+        .form-group {
+            margin-bottom: 20px;
+        }
+
+        label {
+            display: block;
+            margin-bottom: 8px;
+            color: #333;
+            font-weight: 500;
+        }
+
+        input[type="text"] {
+            width: 100%;
+            padding: 12px;
+            border: 2px solid #e0e0e0;
+            border-radius: 6px;
+            font-size: 16px;
+            transition: border-color 0.3s;
+        }
+
+        input[type="text"]:focus {
+            outline: none;
+            border-color: #667eea;
+        }
+
+        input[type="text"]:disabled {
+            background: #f5f5f5;
+            cursor: not-allowed;
+        }
+
+        .btn {
+            width: 100%;
+            padding: 12px;
+            background: linear-gradient(135deg, #667eea 0%, #764ba2 100%);
+            color: white;
+            border: none;
+            border-radius: 6px;
+            font-size: 16px;
+            font-weight: 600;
+            cursor: pointer;
+            transition: transform 0.2s, box-shadow 0.2s;
+        }
+
+        .btn:hover:not(:disabled) {
+            transform: translateY(-2px);
+            box-shadow: 0 10px 20px rgba(102, 126, 234, 0.4);
+        }
+
+        .btn:active:not(:disabled) {
+            transform: translateY(0);
+        }
+
+        .btn:disabled {
+            opacity: 0.6;
+            cursor: not-allowed;
+        }
+
+        .error {
+            color: #e74c3c;
+            font-size: 14px;
+            margin-top: 8px;
+            display: none;
+        }
+
+        .error.show {
+            display: block;
+        }
+
+        .quiz-header {
+            display: flex;
+            justify-content: space-between;
+            align-items: center;
+            margin-bottom: 30px;
+            padding-bottom: 20px;
+            border-bottom: 2px solid #f0f0f0;
+        }
+
+        .progress {
+            font-size: 14px;
+            color: #666;
+            font-weight: 600;
+        }
+
+        .timer {
+            font-size: 24px;
+            font-weight: bold;
+            padding: 8px 16px;
+            border-radius: 6px;
+            min-width: 80px;
+            text-align: center;
+        }
+
+        .timer.warning {
+            background: #fff3cd;
+            color: #856404;
+        }
+
+        .timer.critical {
+            background: #f8d7da;
+            color: #721c24;
+            animation: pulse 0.5s infinite;
+        }
+
+        @keyframes pulse {
+            0%, 100% { transform: scale(1); }
+            50% { transform: scale(1.05); }
+        }
+
+        .question {
+            margin-bottom: 30px;
+        }
+
+        .question-text {
+            font-size: 18px;
+            color: #333;
+            margin-bottom: 20px;
+            font-weight: 600;
+            line-height: 1.6;
+        }
+
+        .options {
+            display: flex;
+            flex-direction: column;
+            gap: 12px;
+        }
+
+        .option {
+            padding: 14px;
+            border: 2px solid #e0e0e0;
+            border-radius: 6px;
+            cursor: pointer;
+            transition: all 0.3s;
+            background: white;
+            font-size: 16px;
+            text-align: left;
+        }
+
+        .option:hover:not(:disabled) {
+            border-color: #667eea;
+            background: #f8f9ff;
+        }
+
+        .option.selected {
+            background: #667eea;
+            color: white;
+            border-color: #667eea;
+        }
+
+        .option:disabled {
+            cursor: not-allowed;
+            opacity: 0.6;
+        }
+
+        .completion-screen {
+            text-align: center;
+        }
+
+        .completion-icon {
+            font-size: 64px;
+            margin-bottom: 20px;
+        }
+
+        .completion-title {
+            color: #333;
+            font-size: 32px;
+            margin-bottom: 15px;
+        }
+
+        .completion-message {
+            color: #666;
+            font-size: 16px;
+            line-height: 1.6;
+            margin-bottom: 30px;
+        }
+
+        .loading {
+            text-align: center;
+            color: #667eea;
+        }
+
+        .spinner {
+            display: inline-block;
+            width: 20px;
+            height: 20px;
+            border: 3px solid #f3f3f3;
+            border-top: 3px solid #667eea;
+            border-radius: 50%;
+            animation: spin 1s linear infinite;
+        }
+
+        @keyframes spin {
+            0% { transform: rotate(0deg); }
+            100% { transform: rotate(360deg); }
+        }
+
+        .note {
+            background: #e7f3ff;
+            color: #0066cc;
+            padding: 12px;
+            border-radius: 6px;
+            font-size: 13px;
+            margin-top: 20px;
+            border-left: 4px solid #0066cc;
+        }
+    </style>
+</head>
+<body>
+    <div class="container">
+        <!-- TELA INICIAL -->
+        <div id="initialScreen" class="screen active">
+            <h1>🎯 Quiz Squad Ânima</h1>
+            <p class="subtitle">Valide seu conhecimento sobre os projetos e produtos apresentados</p>
+
+            <div class="form-group">
+                <label for="firstName">Nome</label>
+                <input type="text" id="firstName" placeholder="Seu nome" autocomplete="given-name">
+            </div>
+
+            <div class="form-group">
+                <label for="lastName">Sobrenome</label>
+                <input type="text" id="lastName" placeholder="Seu sobrenome" autocomplete="family-name">
+            </div>
+
+            <div id="initialError" class="error"></div>
+
+            <button class="btn" onclick="startQuiz()">Começar Quiz</button>
+
+            <div class="note">
+                ⏱️ Você terá 45 segundos para responder cada pergunta. Apenas uma resposta por pessoa é permitida.
+            </div>
+        </div>
+
+        <!-- TELA DO QUIZ -->
+        <div id="quizScreen" class="screen">
+            <div class="quiz-header">
+                <span class="progress">Pergunta <span id="currentQuestion">1</span> de 10</span>
+                <div class="timer" id="timer">45</div>
+            </div>
+
+            <div class="question">
+                <p class="question-text" id="questionText"></p>
+                <div class="options" id="optionsContainer"></div>
+            </div>
+
+            <button class="btn" id="nextBtn" onclick="nextQuestion()" disabled>Próxima Pergunta</button>
+        </div>
+
+        <!-- TELA DE CONCLUSÃO -->
+        <div id="completionScreen" class="screen">
+            <div class="completion-screen">
+                <div class="completion-icon">✅</div>
+                <h2 class="completion-title">Obrigado!</h2>
+                <p class="completion-message" id="completionMessage">
+                    Sua resposta foi registrada com sucesso. <br>
+                    Aproveite o resto do evento! 🎉
+                </p>
+                <div class="loading" id="loadingMessage" style="display: none;">
+                    <div class="spinner"></div>
+                    <p style="margin-top: 10px;">Salvando seus dados...</p>
+                </div>
+            </div>
+        </div>
+    </div>
+
+    <script>
+        // Configuração do Supabase
+        const SUPABASE_URL = 'https://jqlcjwakzvsnavjltbyv.supabase.co';
+        const SUPABASE_KEY = 'sb_publishable_u-crja6vXdablSiMhMsV-Q_-17EtNI5';
+
+        let supabaseClient = null;
+
+        const QUIZ_DATA = [
+            {
+                question: "O conceito \"melhor ver primeiro\", mencionado na apresentação da Squad Exercer/AFP, se refere a qual abordagem?",
+                options: [
+                    "Priorizar a experiência visual no design de interfaces",
+                    "Testar produtos somente após estarem 100% finalizados",
+                    "Apresentar mockups antes de iniciar qualquer desenvolvimento",
+                    "Mostrar um protótipo navegável antes da solução estar perfeita para validar com stakeholders"
+                ],
+                correct: 3
+            },
+            {
+                question: "O programa Titans Alumni da Squad Exercer é voltado para qual público?",
+                options: [
+                    "Alunos do primeiro ano que querem empreender",
+                    "Professores que desejam criar startups",
+                    "Empresas que querem contratar alunos da Ânima",
+                    "Alunos egressos até 5 anos de formação que querem empreender"
+                ],
+                correct: 3
+            },
+            {
+                question: "Além do Conecta, qual o principal produto da Squad CX?",
+                options: [
+                    "HubSpot",
+                    "RD Station",
+                    "Zendesk",
+                    "Omni (plataforma israelense)"
+                ],
+                correct: 3
+            },
+            {
+                question: "Qual foi a redução alcançada no descarte automático de documentos após a implementação de IA no G3D, da Squad Serviços Acadêmicos?",
+                options: [
+                    "De 60% para 10%",
+                    "De 50% para 20%",
+                    "De 20% para 2%",
+                    "De 34% para 4%"
+                ],
+                correct: 3
+            },
+            {
+                question: "Qual integração está sendo realizada na Fase 3 do G3D, da Squad Serviços Acadêmicos?",
+                options: [
+                    "Integração entre ULIFE e Salesforce",
+                    "Integração entre Conecta e WhatsApp",
+                    "Integração entre SIAF e G3D",
+                    "Integração entre SIGA e G3D"
+                ],
+                correct: 3
+            },
+            {
+                question: "Qual produto a Squad Graduar implementou em janeiro de 2026?",
+                options: [
+                    "Certificados por Eventos",
+                    "Diplomas Stricto",
+                    "Celebração da Colação de grau",
+                    "Liberação de Certificados para pós-graduação"
+                ],
+                correct: 3
+            },
+            {
+                question: "Qual é o principal objetivo do CPQ, projeto da Squad CRM dentro do Salesforce?",
+                options: [
+                    "Automatizar o envio de e-mails para candidatos",
+                    "Integrar o sistema de matrículas com o ULIFE",
+                    "Criar um portal de comunicação com alunos inadimplentes",
+                    "Centralizar a gestão de portfólio, bolsas e descontos no Salesforce"
+                ],
+                correct: 3
+            },
+            {
+                question: "Qual produto da Squad CX foi desenvolvido 100% com inteligência artificial?",
+                options: [
+                    "Conecta",
+                    "Max (Omnichannel)",
+                    "Guru de Atendimento",
+                    "Refinildo (plataforma de refinamento)"
+                ],
+                correct: 3
+            },
+            {
+                question: "Qual é o foco principal da Squad Renovar no que diz respeito à jornada do aluno?",
+                options: [
+                    "Captação de novos alunos e campanhas de marketing",
+                    "Emissão de diplomas e certificados de conclusão",
+                    "Comunicação via push notification e WhatsApp",
+                    "Gerenciamento do processo de rematrícula e renovação dos estudos"
+                ],
+                correct: 3
+            },
+            {
+                question: "Quais são as áreas que o Salesforce apoiam?",
+                options: [
+                    "B2B",
+                    "Atração",
+                    "Permanência",
+                    "Todas acima"
+                ],
+                correct: 3
+            }
+        ];
+
+        let currentQuestionIndex = 0;
+        let userAnswers = [];
+        let startTime = 0;
+        let timerInterval = null;
+        let userName = "";
+        let userLastName = "";
+
+        // Inicializar Supabase
+        function initSupabase() {
+            if (window.supabase && !supabaseClient) {
+                supabaseClient = window.supabase.createClient(SUPABASE_URL, SUPABASE_KEY);
+            }
+        }
+
+        window.addEventListener('load', initSupabase);
+
+        async function startQuiz() {
+            const firstName = document.getElementById('firstName').value.trim();
+            const lastName = document.getElementById('lastName').value.trim();
+            const errorEl = document.getElementById('initialError');
+
+            if (!firstName || !lastName) {
+                errorEl.textContent = "Por favor, preencha seu nome e sobrenome.";
+                errorEl.classList.add('show');
+                return;
+            }
+
+            const fullName = `${firstName} ${lastName}`;
+
+            // Verificar se usuário já respondeu
+            try {
+                if (!supabaseClient) {
+                    initSupabase();
+                }
+
+                const { data, error } = await supabaseClient
+                    .from('quiz_responses')
+                    .select('id')
+                    .eq('full_name', fullName)
+                    .single();
+
+                if (data) {
+                    errorEl.textContent = "❌ Desculpe! Você já respondeu este quiz. Apenas uma resposta por pessoa é permitida.";
+                    errorEl.classList.add('show');
+                    document.getElementById('firstName').disabled = true;
+                    document.getElementById('lastName').disabled = true;
+                    return;
+                }
+            } catch (err) {
+                // Se não encontrou, significa que é a primeira resposta (erro é esperado)
+            }
+
+            userName = firstName;
+            userLastName = lastName;
+            startTime = Date.now();
+            userAnswers = [];
+            currentQuestionIndex = 0;
+
+            showScreen('quizScreen');
+            showQuestion();
+        }
+
+        function showQuestion() {
+            const question = QUIZ_DATA[currentQuestionIndex];
+
+            document.getElementById('currentQuestion').textContent = currentQuestionIndex + 1;
+            document.getElementById('questionText').textContent = question.question;
+
+            const optionsContainer = document.getElementById('optionsContainer');
+            optionsContainer.innerHTML = '';
+
+            const letters = ['a)', 'b)', 'c)', 'd)'];
+            question.options.forEach((option, index) => {
+                const div = document.createElement('div');
+                div.className = 'option';
+                div.textContent = `${letters[index]} ${option}`;
+                div.onclick = () => selectOption(index);
+                div.id = `option-${index}`;
+                optionsContainer.appendChild(div);
+            });
+
+            startTimer();
+        }
+
+        function selectOption(index) {
+            userAnswers[currentQuestionIndex] = index;
+
+            document.querySelectorAll('.option').forEach((el, i) => {
+                el.classList.toggle('selected', i === index);
+            });
+
+            document.getElementById('nextBtn').disabled = false;
+        }
+
+        function startTimer() {
+            let timeLeft = 45;
+            const timerEl = document.getElementById('timer');
+
+            clearInterval(timerInterval);
+            timerInterval = setInterval(() => {
+                timerEl.textContent = timeLeft;
+                timerEl.classList.remove('warning', 'critical');
+
+                if (timeLeft <= 10) {
+                    timerEl.classList.add('critical');
+                } else if (timeLeft <= 20) {
+                    timerEl.classList.add('warning');
+                }
+
+                timeLeft--;
+
+                if (timeLeft < 0) {
+                    clearInterval(timerInterval);
+                    nextQuestion();
+                }
+            }, 1000);
+        }
+
+        function nextQuestion() {
+            clearInterval(timerInterval);
+
+            if (currentQuestionIndex < QUIZ_DATA.length - 1) {
+                currentQuestionIndex++;
+                document.getElementById('nextBtn').disabled = true;
+                showQuestion();
+            } else {
+                finishQuiz();
+            }
+        }
+
+        async function finishQuiz() {
+            clearInterval(timerInterval);
+
+            const totalTime = Math.round((Date.now() - startTime) / 1000);
+            const correctAnswers = userAnswers.filter((answer, index) => answer === QUIZ_DATA[index].correct).length;
+
+            // Mostrar tela de conclusão
+            showScreen('completionScreen');
+            document.getElementById('completionMessage').style.display = 'none';
+            document.getElementById('loadingMessage').style.display = 'block';
+
+            // Salvar no Supabase
+            try {
+                if (!supabaseClient) {
+                    initSupabase();
+                }
+
+                const { error } = await supabaseClient
+                    .from('quiz_responses')
+                    .insert([
+                        {
+                            full_name: `${userName} ${userLastName}`,
+                            correct_answers: correctAnswers,
+                            total_time: totalTime
+                        }
+                    ]);
+
+                if (error) throw error;
+
+                // Sucesso - mostrar mensagem
+                setTimeout(() => {
+                    document.getElementById('loadingMessage').style.display = 'none';
+                    document.getElementById('completionMessage').style.display = 'block';
+                }, 1000);
+            } catch (error) {
+                console.error('Erro ao salvar:', error);
+                document.getElementById('loadingMessage').style.display = 'none';
+                document.getElementById('completionMessage').innerHTML = `
+                    Obrigado! Sua resposta foi registrada. <br>
+                    Aproveite o resto do evento! 🎉
+                `;
+                document.getElementById('completionMessage').style.display = 'block';
+            }
+        }
+
+        function showScreen(screenId) {
+            document.querySelectorAll('.screen').forEach(screen => {
+                screen.classList.remove('active');
+            });
+            document.getElementById(screenId).classList.add('active');
+        }
+    </script>
+</body>
+</html>
